@@ -4,6 +4,7 @@
 #include <string.h>
 #include <math.h>
 #include <time.h>
+#include <ctype.h>
 #pragma comment(lib, "winmm.lib")
 #define WIDTH 640      
 #define HIGH 480
@@ -41,8 +42,10 @@ int score;           //分数（整形形式）
 int levelUp;    //等级
 int beginWidth, beginHigh;  //游戏区开始
 bool isFail;   //游戏失败
-int isPause;  //游戏暂停
-int isMedi;  //游戏中断
+bool isPause;  //游戏暂停
+bool isMedi;  //游戏中断
+bool isArchive;  //存档成功
+bool isMusic;  //音乐
 IMAGE img_bk;   //背景图片
 MOUSEMSG m;    //鼠标控制
 int mouse_x, mouse_y;
@@ -62,6 +65,10 @@ void playMusicOnce(CHAR * musicName) {
 //读档
 void readRecord() {
 	startup();
+	//背景音乐
+	mciSendString("close bkMusic", NULL, 0, NULL);
+	mciSendString("open .\\music\\bk2.mp3 alias bkMusic", NULL, 0, NULL);
+	mciSendString("play bkMusic repeat", NULL, 0, NULL);
 	FILE *fp;
 	fopen_s(&fp, "record.txt", "r");
 	int n;
@@ -106,6 +113,7 @@ void writeRecord() {
 		fprintf_s(fp, "\n");
 	}
 	fclose(fp);
+	isArchive = true;
 }
 
 //开始菜单
@@ -117,12 +125,12 @@ void startMenu() {
 	settextstyle(64, 0, _T("华文琥珀"));
 	outtextxy(WIDTH * 0.25, HIGH * 0.1, _T("俄罗斯方块"));
 
-	setcolor(BLUE);
+	/*setcolor(BLUE);
 	setfillcolor(RGB(200,200,200));
 	fillrectangle(WIDTH * 0.39, HIGH * 0.33, WIDTH * 0.61, HIGH * 0.43);
 	fillrectangle(WIDTH * 0.39, HIGH * 0.48, WIDTH * 0.61, HIGH * 0.58);
 	fillrectangle(WIDTH * 0.39, HIGH * 0.63, WIDTH * 0.61, HIGH * 0.73); 
-	fillrectangle(WIDTH * 0.39, HIGH * 0.78, WIDTH * 0.61, HIGH * 0.88);
+	fillrectangle(WIDTH * 0.39, HIGH * 0.78, WIDTH * 0.61, HIGH * 0.88);*/
 
 	if (MouseHit()) {
 		m = GetMouseMsg();   // 获取鼠标信息
@@ -133,7 +141,9 @@ void startMenu() {
 				GAME_CONDITION = 2;
 				playMusicOnce(".\\music\\mouse.wav");
 				Sleep(500);
-				playMusicOnce(".\\music\\game_start.wav");
+				mciSendString("close bkMusic", NULL, 0, NULL);
+				mciSendString("open .\\music\\bk2.mp3 alias bkMusic", NULL, 0, NULL);
+				mciSendString("play bkMusic repeat", NULL, 0, NULL);
 			}
 			else if (choice == 2) { readRecord(); playMusicOnce(".\\music\\mouse.wav"); }
 			else if (choice == 3) { writeRecord(); playMusicOnce(".\\music\\mouse.wav"); }
@@ -142,34 +152,35 @@ void startMenu() {
 	}
 
 	choice = 0;
-	settextcolor(BLUE);	
+	settextcolor(WHITE);	
 	if (mouse_x >= WIDTH * 0.39 && mouse_x <= WIDTH * 0.61 && mouse_y >= HIGH * 0.33 && mouse_y <= HIGH * 0.43) {
-		settextstyle(32, 0, _T("楷体"));
+		settextstyle(32, 0, _T("华文彩云"));
 		choice = 1;
 	}
-	else settextstyle(32, 0, _T("华文彩云"));
+	else settextstyle(32, 0, _T("楷体"));
 	if(isMedi) outtextxy(WIDTH * 0.4, HIGH * 0.35, _T("继续游戏"));
 	else outtextxy(WIDTH * 0.4, HIGH * 0.35, _T("开始游戏"));
 
 	if (mouse_x >= WIDTH * 0.39 && mouse_x<= WIDTH * 0.61 && mouse_y >= HIGH * 0.48 && mouse_y <= HIGH * 0.58) {
-		settextstyle(32, 0, _T("楷体"));
+		settextstyle(32, 0, _T("华文彩云"));
 		choice = 2;
 	}
-	else 	settextstyle(32, 0, _T("华文彩云"));
+	else 	settextstyle(32, 0, _T("楷体"));
 	outtextxy(WIDTH * 0.4, HIGH * 0.50, _T("载入进度"));
 
 	if (mouse_x >= WIDTH * 0.39 && mouse_x <= WIDTH * 0.61 && mouse_y >= HIGH * 0.63 && mouse_y <= HIGH * 0.73) {
-		settextstyle(32, 0, _T("楷体"));
+		settextstyle(32, 0, _T("华文彩云"));
 		choice = 3;
 	}
-	else settextstyle(32, 0, _T("华文彩云"));
-	outtextxy(WIDTH * 0.4, HIGH * 0.65, _T("保存进度"));
+	else { settextstyle(32, 0, _T("楷体")); isArchive = false; }
+	if (isArchive) outtextxy(WIDTH * 0.4, HIGH * 0.65, _T("保存成功")); 
+	else outtextxy(WIDTH * 0.4, HIGH * 0.65, _T("保存进度"));
 
 	if (mouse_x >= WIDTH * 0.39 && mouse_x <= WIDTH * 0.61 && mouse_y >= HIGH * 0.78 && mouse_y <= HIGH * 0.88) {
-		settextstyle(32, 0, _T("楷体"));
+		settextstyle(32, 0, _T("华文彩云"));
 		choice = 4;
 	}
-	else settextstyle(32, 0, _T("华文彩云"));
+	else settextstyle(32, 0, _T("楷体"));
 	outtextxy(WIDTH * 0.45, HIGH * 0.80, _T("退出"));
 
 	FlushBatchDraw();
@@ -271,6 +282,8 @@ void startup() {
 	isFail = false;   //失败
 	isPause = false;   //暂停
 	isMedi = false;    // 中断
+	isArchive = false;  //存档
+	isMusic = true;  //音乐
 
 	loadimage(&img_bk, ".\\picture\\bk.jpg");  //载入图片
 
@@ -282,8 +295,8 @@ void startup() {
 	initgraph(WIDTH, HIGH);
 	BeginBatchDraw();
 
-	/*mciSendString("open .\\music\\bk.wma alias bkMusic", NULL, 0, NULL);
-	mciSendString("play bkMusic repeat", NULL, 0, NULL);*/
+	mciSendString("open .\\music\\bk1.mp3 alias bkMusic", NULL, 0, NULL);
+	mciSendString("play bkMusic repeat", NULL, 0, NULL);
 }
 
 //显示
@@ -337,10 +350,17 @@ void show() {
 		}
 	}
 
+	// 游戏说明
+	settextcolor(WHITE);
+	settextstyle(20, 0, _T("黑体"));
+	outtextxy(20, 40, _T("W  变形"));
+	outtextxy(20, 80, _T("A  左移"));
+	outtextxy(20, 120, _T("D  左移"));
+	outtextxy(20, 160, _T("S  坠下"));
+
 	//下一个图形预知
 	settextcolor(WHITE);
 	settextstyle(20, 0, _T("黑体"));
-
 	outtextxy(pre_x, pre_y, _T("下一个:"));
 
 	for (int i = 0; i < 4; i++) {             //4 X 4 表格
@@ -366,7 +386,7 @@ void show() {
 	char scoreC[10];   //分数（字符形式）
 	sprintf_s(scoreC, "%5d", score);
 	outtextxy(score_x + 60, score_y, scoreC);
-
+	//等级
 	int level_x = pre_x;
 	int level_y = score_y + BOX_HIGH * 4;
 	outtextxy(level_x, level_y, _T("等级："));
@@ -402,27 +422,41 @@ void show() {
 		isFail = 0;
 	}
 
-	setcolor(BLUE);
-	setfillcolor(RGB(200, 200, 200));
+	//“继续”与“返回主菜单”
+	/*setcolor(BLACK);
+	setfillcolor(BLACK);
 	fillrectangle(pre_x + 80, pre_y + 280, pre_x + 160, pre_y + 320);
-	fillrectangle(pre_x + 30, pre_y + 360, pre_x + 210, pre_y + 400);
+	fillrectangle(pre_x + 30, pre_y + 360, pre_x + 210, pre_y + 400);*/
 
 	choice = 0;
-	settextcolor(BLUE);
+	settextcolor(WHITE);
 	if (mouse_x >= pre_x + 80 && mouse_x <= pre_x + 160 && mouse_y >= pre_y + 280 && mouse_y <= pre_y + 320) {
-		settextstyle(32, 0, _T("楷体"));
+		settextstyle(32, 0, _T("华文彩云"));
 		choice = 1;
 	}
-	else settextstyle(32, 0, _T("华文彩云"));
+	else settextstyle(32, 0, _T("楷体"));
 	if (isPause) outtextxy(pre_x + 88, pre_y + 285, _T("继续"));
 	else outtextxy(pre_x + 88, pre_y + 285, _T("暂停"));
 
 	if (mouse_x >= pre_x + 30 && mouse_x <= pre_x + 210 && mouse_y >= pre_y + 360 && mouse_y <= pre_y + 400) {
-		settextstyle(32, 0, _T("楷体"));
+		settextstyle(32, 0, _T("华文彩云"));
 		choice = 2;
 	}
-	else 	settextstyle(32, 0, _T("华文彩云"));
+	else 	settextstyle(32, 0, _T("楷体"));
 	outtextxy(pre_x + 38, pre_y + 365, _T("返回主菜单"));
+
+	//关闭音乐
+	/*setcolor(BLACK);
+	setfillcolor(BLACK);
+	fillrectangle(5, 235, 90, 265);*/
+	settextcolor(WHITE);
+	if (mouse_x >= 10 && mouse_x <= 235 && mouse_y >= 90 && mouse_y <= 265) {
+		settextstyle(20, 0, _T("华文彩云"));
+		choice = 3;
+	}
+	else settextstyle(20, 0, _T("楷体"));
+	if (isMusic)  outtextxy(10, 240, _T("音乐：开"));
+	else outtextxy(10, 240, _T("音乐：关"));
 
 	FlushBatchDraw();   //清除页面
 	Sleep(200 - levelUp * 20);
@@ -507,6 +541,7 @@ void updateWithoutInput() {
 	for(int i = 1; i <= GAME_WIDTH; i++)
 		if (board[i][0] == 3) {
 			isFail = true;
+			mciSendString("close bkMusic", NULL, 0, NULL);
 			playMusicOnce(".\\music\\fail2.wav");
 		}
 	// 图形向下移动
@@ -535,7 +570,8 @@ void updateWithInput() {
 				}
 			}
 		}
-		input = _getch();
+		input = tolower(_getch());
+		
 		if (input == 'a' && !isLeftBar) four_x--;   //左移
 		else if (input == 'd' && !isRightBar) four_x++;  //右移
 		else if (input == 's') while (four_y != -2) updateWithoutInput();   //一落到地
@@ -551,6 +587,16 @@ void updateWithInput() {
 				GAME_CONDITION = 1;   //中断，返回主菜单
 				isMedi = true;
 				playMusicOnce(".\\music\\mouse.wav");
+			}
+			else if (choice == 3) {
+				if (isMusic) {  //音乐开关
+					mciSendString("pause bkMusic", NULL, 0, NULL);
+					isMusic = false;
+				}
+				else {
+					mciSendString("resume bkMusic", NULL, 0, NULL);
+					isMusic = true;
+				}
 			}
 			if (choice == 1) {    //暂停
 				isPause = true;
@@ -569,6 +615,16 @@ void updateWithInput() {
 					GAME_CONDITION = 1;
 					isMedi = true;
 					playMusicOnce(".\\music\\mouse.wav");
+				}
+				else if (choice == 3) {
+					if (isMusic) {  //音乐开关
+						mciSendString("pause bkMusic", NULL, 0, NULL);
+						isMusic = false;
+					}
+					else {
+						mciSendString("resume bkMusic", NULL, 0, NULL);
+						isMusic = true;
+					}
 				}
 				else if (choice == 1) {
 					isPause = false;
