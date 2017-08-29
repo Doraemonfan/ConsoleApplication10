@@ -2,7 +2,9 @@
 #include <graphics.h>
 #include <conio.h>
 #include <string.h>
+#include <math.h>
 #include <time.h>
+#pragma comment(lib, "winmm.lib")
 #define WIDTH 640      
 #define HIGH 480
 #define GAME_WIDTH 15    //游戏区横列格子数
@@ -10,24 +12,169 @@
 #define BOX_WIDTH 15     //一个格子的宽度
 #define BOX_HIGH 15     //一个格子的长度
 
+//函数声明
 void startup();  //初始化
 void show();     //图像显示
 void gameover();  //游戏结束设置
 void fourKinds(int four[4][4], int kind); // 新的形状图形
-void updateWithInput();
-void updateWithoutInput();
-void transformation();
+void updateWithInput();   //无输入更新
+void updateWithoutInput();  //有输入更新
+void transformation();  //变形
+void startMenu();    //开始菜单
+void pauseStart();    //暂停菜单
+void playMusicOnce(CHAR *musicName);  //播放音效一次
+void readRecord();  //读档
+void writeRecord();  //存档
 
-int board[GAME_WIDTH + 2][GAME_HIGH + 2];
-int nowFour[4][4];
-int nextFour[4][4];
-int nowKind;
-int nextKind;
+//全局变量
+int GAME_CONDITION = 1; // 游戏状态，1为开始菜单， 0为退出， 2 为正式游戏
+
+int board[GAME_WIDTH + 2][GAME_HIGH + 2];  //游戏区
+int nowFour[4][4];       //现在图形
+int nextFour[4][4];     // 下一个图形
+int nowKind;            //现在图形种类
+int nextKind;          //下一个图形种类
 int four_x, four_y;  //图形位置
+COLORREF color;        //图形颜色
 int pre_x, pre_y;   //预告位置
-char scoreC[10];
-int score;
+int score;           //分数（整形形式）
+int levelUp;    //等级
 int beginWidth, beginHigh;  //游戏区开始
+bool isFail;   //游戏失败
+int isPause;  //游戏暂停
+int isMedi;  //游戏中断
+IMAGE img_bk;   //背景图片
+MOUSEMSG m;    //鼠标控制
+int mouse_x, mouse_y;
+int choice;  //鼠标选择
+
+//函数定义
+// 播放音效一次
+void playMusicOnce(CHAR * musicName) {
+	CHAR playMusic[50] = "open ";
+	strcat_s(playMusic, musicName);
+	strcat_s(playMusic, " alias tempMusic");
+	mciSendString("close tempMusic", NULL, 0, NULL);
+	mciSendString(playMusic, NULL, 0, NULL);
+	mciSendString("play tempMusic", NULL, 0, NULL);
+}
+
+//读档
+void readRecord() {
+	startup();
+	FILE *fp;
+	fopen_s(&fp, "record.txt", "r");
+	int n;
+	fscanf_s(fp, "%d", &n);
+	if (n == -1) {
+		fscanf_s(fp, "%d %d %d %d %d %d", &score, &isFail, &four_x, &four_y, &nowKind, &nextKind);
+		for (int i = 0; i < 4; i++)
+			for (int j = 0; j < 4; j++)
+				fscanf_s(fp, "%d ", &nowFour[i][j]);
+		for (int i = 0; i < 4; i++)
+			for (int j = 0; j < 4; j++)
+				fscanf_s(fp, "%d ", &nextFour[i][j]);
+		for (int i = 1; i <= GAME_WIDTH; i++)
+			for (int j = 1; j <= GAME_HIGH; j++)
+				fscanf_s(fp, "%d ", &board[i][j]);
+		GAME_CONDITION = 2;
+	}
+	fclose(fp);
+}
+
+//存档
+void writeRecord() {
+	FILE * fp;
+	fopen_s(&fp, "record.txt", "w");
+	fprintf_s(fp, "%d\n\n", -1);
+	fprintf_s(fp, "%d %d %d %d %d %d\n\n", score, isFail, four_x, four_y, nowKind, nextKind);
+	for (int i = 0; i < 4; i++) {
+		for (int j = 0; j < 4; j++)
+			fprintf_s(fp, "%d ", nowFour[i][j]);
+		fprintf_s(fp, "\n");
+	}
+	fprintf_s(fp, "\n");
+	for (int i = 0; i < 4; i++) {
+		for (int j = 0; j < 4; j++)
+			fprintf_s(fp, "%d ", nextFour[i][j]);
+		fprintf_s(fp, "\n");
+	}
+	fprintf_s(fp, "\n");
+	for (int i = 1; i <= GAME_WIDTH; i++) {
+		for (int j = 1; j <= GAME_HIGH; j++)
+			fprintf_s(fp, "%d ", board[i][j]);
+		fprintf_s(fp, "\n");
+	}
+	fclose(fp);
+}
+
+//开始菜单
+void startMenu() {
+	putimage(0, 0, &img_bk);
+	setbkmode(TRANSPARENT);
+
+	settextcolor(GREEN);
+	settextstyle(64, 0, _T("华文琥珀"));
+	outtextxy(WIDTH * 0.25, HIGH * 0.1, _T("俄罗斯方块"));
+
+	setcolor(BLUE);
+	setfillcolor(RGB(200,200,200));
+	fillrectangle(WIDTH * 0.39, HIGH * 0.33, WIDTH * 0.61, HIGH * 0.43);
+	fillrectangle(WIDTH * 0.39, HIGH * 0.48, WIDTH * 0.61, HIGH * 0.58);
+	fillrectangle(WIDTH * 0.39, HIGH * 0.63, WIDTH * 0.61, HIGH * 0.73); 
+	fillrectangle(WIDTH * 0.39, HIGH * 0.78, WIDTH * 0.61, HIGH * 0.88);
+
+	if (MouseHit()) {
+		m = GetMouseMsg();   // 获取鼠标信息
+		mouse_x = m.x;
+		mouse_y = m.y;	
+		if (m.uMsg == WM_LBUTTONUP) {
+			if (choice == 1) { 
+				GAME_CONDITION = 2;
+				playMusicOnce(".\\music\\mouse.wav");
+				Sleep(500);
+				playMusicOnce(".\\music\\game_start.wav");
+			}
+			else if (choice == 2) { readRecord(); playMusicOnce(".\\music\\mouse.wav"); }
+			else if (choice == 3) { writeRecord(); playMusicOnce(".\\music\\mouse.wav"); }
+			else if (choice == 4) { playMusicOnce(".\\music\\mouse.wav"); Sleep(100); gameover(); }
+		}
+	}
+
+	choice = 0;
+	settextcolor(BLUE);	
+	if (mouse_x >= WIDTH * 0.39 && mouse_x <= WIDTH * 0.61 && mouse_y >= HIGH * 0.33 && mouse_y <= HIGH * 0.43) {
+		settextstyle(32, 0, _T("楷体"));
+		choice = 1;
+	}
+	else settextstyle(32, 0, _T("华文彩云"));
+	if(isMedi) outtextxy(WIDTH * 0.4, HIGH * 0.35, _T("继续游戏"));
+	else outtextxy(WIDTH * 0.4, HIGH * 0.35, _T("开始游戏"));
+
+	if (mouse_x >= WIDTH * 0.39 && mouse_x<= WIDTH * 0.61 && mouse_y >= HIGH * 0.48 && mouse_y <= HIGH * 0.58) {
+		settextstyle(32, 0, _T("楷体"));
+		choice = 2;
+	}
+	else 	settextstyle(32, 0, _T("华文彩云"));
+	outtextxy(WIDTH * 0.4, HIGH * 0.50, _T("载入进度"));
+
+	if (mouse_x >= WIDTH * 0.39 && mouse_x <= WIDTH * 0.61 && mouse_y >= HIGH * 0.63 && mouse_y <= HIGH * 0.73) {
+		settextstyle(32, 0, _T("楷体"));
+		choice = 3;
+	}
+	else settextstyle(32, 0, _T("华文彩云"));
+	outtextxy(WIDTH * 0.4, HIGH * 0.65, _T("保存进度"));
+
+	if (mouse_x >= WIDTH * 0.39 && mouse_x <= WIDTH * 0.61 && mouse_y >= HIGH * 0.78 && mouse_y <= HIGH * 0.88) {
+		settextstyle(32, 0, _T("楷体"));
+		choice = 4;
+	}
+	else settextstyle(32, 0, _T("华文彩云"));
+	outtextxy(WIDTH * 0.45, HIGH * 0.80, _T("退出"));
+
+	FlushBatchDraw();
+	clearrectangle(0, 0, WIDTH - 1, HIGH - 1);
+}
 
 // 获取新的形状图形，各种图形在 4 X 4 表格中的显示
 void fourKinds(int four[4][4], int kind) {
@@ -55,6 +202,16 @@ void fourKinds(int four[4][4], int kind) {
 	else if (kind == 41) { int temp[4][4] = { { 0,0,1,0 },{ 0,1,1,0 },{ 0,0,1,0 },{ 0,0,0,0 } }; memcpy(four, temp, sizeof(int) * 16); }
 	else if (kind == 42) { int temp[4][4] = { { 1,1,1,0 },{ 0,1,0,0 },{ 0,0,0,0 },{ 0,0,0,0 } }; memcpy(four, temp, sizeof(int) * 16); }
 	else if (kind == 43) { int temp[4][4] = { { 1,0,0,0 },{ 1,1,0,0 },{ 1,0,0,0 },{ 0,0,0,0 } }; memcpy(four, temp, sizeof(int) * 16); }
+
+	else if (kind == 50) { int temp[4][4] = { { 0,1,0,0 },{ 0,1,1,0 },{ 0,0,1,0 },{ 0,0,0,0 } }; memcpy(four, temp, sizeof(int) * 16); }
+	else if (kind == 51) { int temp[4][4] = { { 0,0,0,0 },{ 0,0,1,1 },{ 0,1,1,0 },{ 0,0,0,0 } }; memcpy(four, temp, sizeof(int) * 16); }
+	else if (kind == 52) { int temp[4][4] = { { 0,1,0,0 },{ 0,1,1,0 },{ 0,0,1,0 },{ 0,0,0,0 } }; memcpy(four, temp, sizeof(int) * 16); }
+	else if (kind == 53) { int temp[4][4] = { { 0,0,0,0 },{ 0,0,1,1 },{ 0,1,1,0 },{ 0,0,0,0 } }; memcpy(four, temp, sizeof(int) * 16); }
+
+	else if (kind == 60) { int temp[4][4] = { { 0,0,0,0 },{ 0,0,1,0 },{ 0,1,1,0 },{ 0,1,0,0 } }; memcpy(four, temp, sizeof(int) * 16); }
+	else if (kind == 61) { int temp[4][4] = { { 0,0,0,0 },{ 0,1,1,0 },{ 0,0,1,1 },{ 0,0,0,0 } }; memcpy(four, temp, sizeof(int) * 16); }
+	else if (kind == 62) { int temp[4][4] = { { 0,0,0,0 },{ 0,0,1,0 },{ 0,1,1,0 },{ 0,1,0,0 } }; memcpy(four, temp, sizeof(int) * 16); }
+	else if (kind == 63) { int temp[4][4] = { { 0,0,0,0 },{ 0,1,1,0 },{ 0,0,1,1 },{ 0,0,0,0 } }; memcpy(four, temp, sizeof(int) * 16); }
 }
 
 //变形
@@ -85,6 +242,7 @@ void transformation() {
 	if (isTrans) {
 		memcpy(nowFour, tempFour, sizeof(int) * 16);
 		nowKind = tempKind;
+		playMusicOnce(".\\music\\trans.wav");
 	}
 }
 
@@ -94,27 +252,47 @@ void startup() {
 	beginWidth = WIDTH / 6;           //游戏区位置
 	beginHigh = HIGH / 18;
 	score = 0;               //分数
+	levelUp = 1;
 
 	srand((unsigned)time(NULL));
 
-	nowKind = (rand() % 5) * 10 + rand() % 4;
+	nowKind = (rand() % 7) * 10 + rand() % 4;
 	fourKinds(nowFour, nowKind);          //随机开始图形
-	nextKind = (rand() % 5) * 10 + rand() % 4;
+	nextKind = (rand() % 7) * 10 + rand() % 4;
 	fourKinds(nextFour, nextKind);        //随机下一个图形
 
 	four_x = rand() % (GAME_WIDTH - 6) + 2;   //随机图形区初始位置
 	four_y = -3;    
+	color = RGB(rand() % 255, rand() % 255, rand() % 255);
 
-	pre_x = beginWidth + (GAME_WIDTH + 4) * BOX_WIDTH;
+	pre_x = beginWidth + (GAME_WIDTH + 4) * BOX_WIDTH;  //“下一个”区域位置
 	pre_y = beginHigh + BOX_WIDTH;
+
+	isFail = false;   //失败
+	isPause = false;   //暂停
+	isMedi = false;    // 中断
+
+	loadimage(&img_bk, ".\\picture\\bk.jpg");  //载入图片
+
+	mouse_x = 0;  //初始鼠标位置为（0，0）
+	mouse_y = 0;
+
+	choice = 0;
 
 	initgraph(WIDTH, HIGH);
 	BeginBatchDraw();
 
+	/*mciSendString("open .\\music\\bk.wma alias bkMusic", NULL, 0, NULL);
+	mciSendString("play bkMusic repeat", NULL, 0, NULL);*/
 }
 
 //显示
 void show() {
+	while (GAME_CONDITION == 1) startMenu(); // 进入开始菜单
+
+	putimage(0, 0, &img_bk);
+	setbkmode(TRANSPARENT);
+
 	//游戏区显示
 	for (int i = 0; i < GAME_WIDTH + 2; i++) {
 		for (int j = 0; j < GAME_HIGH + 2; j++) {
@@ -185,10 +363,19 @@ void show() {
 	int score_x = pre_x;
 	int score_y = pre_y + BOX_HIGH * 8;
 	outtextxy(score_x, score_y, _T("得分:"));
+	char scoreC[10];   //分数（字符形式）
 	sprintf_s(scoreC, "%5d", score);
 	outtextxy(score_x + 60, score_y, scoreC);
 
+	int level_x = pre_x;
+	int level_y = score_y + BOX_HIGH * 4;
+	outtextxy(level_x, level_y, _T("等级："));
+	char levelC[10];
+	sprintf_s(levelC, "%5d", levelUp);
+	outtextxy(level_x + 60, level_y, levelC);
+
 	//nowFour[4][4]当前图形显示
+	
 	for (int i = 0; i < 4; i++) {
 		for (int j = 0; j < 4; j++) {
 			if (nowFour[i][j] == 1 && four_y + j > 0) {
@@ -197,29 +384,49 @@ void show() {
 				int begin_j = (four_y + j) * BOX_HIGH + beginHigh;
 				int end_j = (four_y + j + 1) * BOX_HIGH + beginHigh;
 				setcolor(BLUE);
-				setfillcolor(WHITE);
+				
+				setfillcolor(color);
 				fillrectangle(begin_i, begin_j, end_i, end_j);
 			}
 		}
 	}
 
-	FlushBatchDraw();
-	Sleep(150);
-	
-	//擦去原位置图形
-	for (int i = 0; i < 4; i++) {
-		for (int j = 0; j < 4; j++) {
-			if (nowFour[i][j] == 1 && four_y + j > 0) {
-				int begin_i = (four_x + i) * BOX_WIDTH + beginWidth;
-				int end_i = (four_x + i + 1) * BOX_WIDTH + beginWidth;
-				int begin_j = (four_y + j) * BOX_HIGH + beginHigh;
-				int end_j = (four_y + j + 1) * BOX_HIGH + beginHigh;
-				setcolor(BLACK);
-				setfillcolor(BLACK);
-				fillrectangle(begin_i, begin_j, end_i, end_j);
-			}
-		}
+	//失败显示
+	if (isFail) {
+		settextcolor(BLUE);
+		settextstyle(64, 0, _T("黑体"));
+		outtextxy(WIDTH / 4, HIGH / 3, _T("Game over!"));
+		FlushBatchDraw();
+		GAME_CONDITION = 1;
+		Sleep(8000);
+		isFail = 0;
 	}
+
+	setcolor(BLUE);
+	setfillcolor(RGB(200, 200, 200));
+	fillrectangle(pre_x + 80, pre_y + 280, pre_x + 160, pre_y + 320);
+	fillrectangle(pre_x + 30, pre_y + 360, pre_x + 210, pre_y + 400);
+
+	choice = 0;
+	settextcolor(BLUE);
+	if (mouse_x >= pre_x + 80 && mouse_x <= pre_x + 160 && mouse_y >= pre_y + 280 && mouse_y <= pre_y + 320) {
+		settextstyle(32, 0, _T("楷体"));
+		choice = 1;
+	}
+	else settextstyle(32, 0, _T("华文彩云"));
+	if (isPause) outtextxy(pre_x + 88, pre_y + 285, _T("继续"));
+	else outtextxy(pre_x + 88, pre_y + 285, _T("暂停"));
+
+	if (mouse_x >= pre_x + 30 && mouse_x <= pre_x + 210 && mouse_y >= pre_y + 360 && mouse_y <= pre_y + 400) {
+		settextstyle(32, 0, _T("楷体"));
+		choice = 2;
+	}
+	else 	settextstyle(32, 0, _T("华文彩云"));
+	outtextxy(pre_x + 38, pre_y + 365, _T("返回主菜单"));
+
+	FlushBatchDraw();   //清除页面
+	Sleep(200 - levelUp * 20);
+	clearrectangle(0, 0, WIDTH - 1, HIGH - 1);
 }
 
 //无输入更新
@@ -239,7 +446,9 @@ void updateWithoutInput() {
 		if (isHit) break;
 	}
 
+	//沉积
 	if (isHit) {
+		playMusicOnce(".\\music\\down.wav");
 		for (int i = 0; i < 4; i++ ) {
 			for (int j = 0; j < 4; j++) {
 				if (nowFour[i][j] == 1) {
@@ -265,45 +474,49 @@ void updateWithoutInput() {
 				}
 			}
 		}
-		nextKind = (rand() % 5) * 10 + rand() % 4;
+		nextKind = (rand() % 7) * 10 + rand() % 4;
 		fourKinds(nextFour, nextKind);   //随机预告新图形
 		four_x = rand() % (GAME_WIDTH - 6) + 2;   //随机图形区初始位置
 		four_y = -3;
+		color = RGB(rand() % 255, rand() % 255, rand() % 255);
 		isHit = false;
 	}
 
 	//消去满行,分数增加
-	
 	for (int j = 1; j <= GAME_HIGH; j++) {
 		int tempSum = 0;
 		for (int i = 1; i <= GAME_WIDTH; i++)
 			tempSum += board[i][j];
 		if (tempSum == 3 * GAME_WIDTH) {
-			score++;
+			score++; 
+			playMusicOnce(".\\music\\full.wav");
 			for (int k = j; k > 0; k--)
 				for (int i = 1; i <= GAME_WIDTH; i++)
 					board[i][k] = board[i][k - 1];
 		}
 	}
 
+	//根据分数计算等级
+	int temp = score / 5 + 1;
+	if (temp - levelUp == 1) {
+		playMusicOnce(".\\music\\level_up.wav");
+		levelUp++;
+	}
+
 	//堆满失败
 	for(int i = 1; i <= GAME_WIDTH; i++)
 		if (board[i][0] == 3) {
-			settextcolor(BLUE);
-			settextstyle(64, 0, _T("黑体"));
-			outtextxy(WIDTH / 4, HIGH / 3, _T("Game over!"));
-			FlushBatchDraw();
-			_getch();
-			exit(0);
+			isFail = true;
+			playMusicOnce(".\\music\\fail2.wav");
 		}
-
+	// 图形向下移动
 	four_y += 1;
 }
 
 //有输入更新
 void updateWithInput() {
 	CHAR input;
-	if (_kbhit()) {
+	if (_kbhit()) {  //有移动操作输入
 		bool isLeftBar = false;    //判断是否为边界
 		bool isRightBar = false;
 		for (int i = 0; i < 4; i++) {
@@ -328,13 +541,49 @@ void updateWithInput() {
 		else if (input == 's') while (four_y != -2) updateWithoutInput();   //一落到地
 		else if (input == 'w') transformation();   // 变形
 	}
+
+	while (MouseHit()) {  //有鼠标操作输入
+		m = GetMouseMsg();  //获得鼠标信息
+		mouse_x = m.x;
+		mouse_y = m.y;
+		if (m.uMsg == WM_LBUTTONUP) {   //左键按下
+			if (choice == 2) {
+				GAME_CONDITION = 1;   //中断，返回主菜单
+				isMedi = true;
+				playMusicOnce(".\\music\\mouse.wav");
+			}
+			if (choice == 1) {    //暂停
+				isPause = true;
+				playMusicOnce(".\\music\\pause.wav");
+			}
+		}
+	}
+	while (isPause) {    //暂停状态，鼠标按”继续“继续游戏
+		show();
+		while (MouseHit()) {
+			m = GetMouseMsg();
+			mouse_x = m.x;
+			mouse_y = m.y;
+			if (m.uMsg == WM_LBUTTONUP) {
+				if (choice == 2) {
+					GAME_CONDITION = 1;
+					isMedi = true;
+					playMusicOnce(".\\music\\mouse.wav");
+				}
+				else if (choice == 1) {
+					isPause = false;
+					playMusicOnce(".\\music\\pause.wav");
+				}
+			}
+		}
+	}
 }
 
 //游戏结束设置
 void gameover() {
-	_getch();
 	EndBatchDraw();
 	closegraph();
+	exit(0);
 }
 
 //主函数
