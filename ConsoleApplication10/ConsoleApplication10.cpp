@@ -123,8 +123,10 @@ void startMenu() {
 
 	settextcolor(GREEN);
 	settextstyle(64, 0, _T("华文琥珀"));
-	outtextxy(WIDTH * 0.25, HIGH * 0.1, _T("俄罗斯方块"));
-
+	outtextxy(WIDTH * 0.25, HIGH * 0.08, _T("俄罗斯方块"));
+	setcolor(WHITE);
+	settextstyle(16, 0, _T("楷体"));
+	outtextxy(WIDTH * 0.42, HIGH * 0.25, _T("作者：Dora ^-^"));
 	/*setcolor(BLUE);
 	setfillcolor(RGB(200,200,200));
 	fillrectangle(WIDTH * 0.39, HIGH * 0.33, WIDTH * 0.61, HIGH * 0.43);
@@ -355,7 +357,7 @@ void show() {
 	settextstyle(20, 0, _T("黑体"));
 	outtextxy(20, 40, _T("W  变形"));
 	outtextxy(20, 80, _T("A  左移"));
-	outtextxy(20, 120, _T("D  左移"));
+	outtextxy(20, 120, _T("D  右移"));
 	outtextxy(20, 160, _T("S  坠下"));
 
 	//下一个图形预知
@@ -417,9 +419,10 @@ void show() {
 		settextstyle(64, 0, _T("黑体"));
 		outtextxy(WIDTH / 4, HIGH / 3, _T("Game over!"));
 		FlushBatchDraw();
-		GAME_CONDITION = 1;
 		Sleep(8000);
 		isFail = 0;
+		GAME_CONDITION = 1;
+		startup();
 	}
 
 	//“继续”与“返回主菜单”
